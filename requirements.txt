@@ -3,3 +3,4 @@ matplotlib==3.10.3
 albumentations==2.0.8
 opencv-python==4.11.0.86
 numpy==2.2.6
+plantcv==4.7
