@@ -1,6 +1,7 @@
 flake8==7.2.0
 matplotlib==3.10.3
 albumentations==2.0.8
-opencv-python==4.11.0.86
 numpy==2.2.6
-plantcv==4.7
+opencv-python==4.11.0.86
+plantcv==4.3.1
+ipython==9.3.0
