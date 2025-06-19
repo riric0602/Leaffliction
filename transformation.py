@@ -5,21 +5,19 @@ import numpy as np
 from plantcv import plantcv as pcv
 
 
-
 pcv.params.debug = "plot"
 
 
-def mask_transformation(binary_img: np.ndarray, img: np.ndarray):
-    # Clean the mask (e.g. fill small holes)
-    mask = pcv.fill(bin_img=binary_img, size=5)
+def mask_transformation(labeled_mask: np.ndarray, img: np.ndarray):
+    return pcv.apply_mask(img=img, mask=labeled_mask, mask_color="white")
 
-    # Apply the mask to the original RGB image
-    masked_image = pcv.apply_mask(img=img, mask=mask, mask_color='black')
-
-    return masked_image
 
 def gaussian_blur_transformation(gray: np.ndarray) -> np.ndarray:
-    return pcv.gaussian_blur(img=gray, ksize=(21, 21), sigma_x=5, sigma_y=5)
+    return pcv.gaussian_blur(img=gray, ksize=(5, 5))
+
+
+def object_analysis_transformation(labeled_mask: np.ndarray, img: np.ndarray):
+    return pcv.analyze.size(img=img, labeled_mask=labeled_mask, n_labels=1)
 
 
 def image_transformation(img_path: str) -> None:
@@ -28,11 +26,25 @@ def image_transformation(img_path: str) -> None:
     gray_img = pcv.rgb2gray_lab(rgb_img=img, channel='l')
     binary_img = pcv.threshold.binary(gray_img, threshold=120, object_type='light')
 
-    # Apply Gaussian blur to reduce noise
+    # Apply Gaussian blur transformation
     blurred = gaussian_blur_transformation(gray_img)
 
     # Apply Mask transformation
-    mask = mask_transformation(binary_img, img)
+    labeled_mask = pcv.fill(bin_img=binary_img, size=50)
+    mask = mask_transformation(labeled_mask, img)
+
+    # Apply Object Analysis transformation
+    shape_img = object_analysis_transformation(labeled_mask, img)
+
+    # Apply Object Boundaries transformation
+    analysis_images = pcv.watershed_segmentation(rgb_img=img, mask=labeled_mask, distance=15, label="default")
+
+    # Apply Pseudo-Landmarks transformation
+    homolog_pts, start_pts, stop_pts, ptvals, chain, max_dist = pcv.homology.acute(img=img, mask=labeled_mask, win=25,
+                                                                                   threshold=90)
+
+    # Apply Histogram of Color Repartition Transformation
+    hist_figure, hist_data = pcv.visualize.histogram(img=img, mask=labeled_mask, hist_data=True)
 
 
 def get_image_files(paths: list) -> list:
