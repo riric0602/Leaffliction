@@ -40,7 +40,7 @@ def pseudo_landmarks_transformation(labeled_mask: np.ndarray, img: np.ndarray):
     return pcv.homology.acute(img=img, mask=labeled_mask, win=25, threshold=90)
 
 def color_histogram_transformation(labeled_mask: np.ndarray, img: np.ndarray):
-    return pcv.visualize.histogram(img=img, mask=labeled_mask, hist_data=True)
+        return pcv.visualize.histogram(img=img, mask=labeled_mask, hist_data=True)
 
 
 def plot_transformations(transformed_images):
@@ -81,7 +81,7 @@ def plot_transformations(transformed_images):
     plt.show()
 
 
-def plot_histogram(hist_data):
+def plot_histogram(hist_data, save_path):
     plt.figure(figsize=(10, 6))
 
     for color in ['blue', 'green', 'red']:
@@ -93,7 +93,12 @@ def plot_histogram(hist_data):
     plt.title('Histogram of Pixel Intensities by Color Channel')
     plt.legend()
     plt.grid(True)
-    plt.show()
+
+    if not save_path:
+        plt.show()
+    else:
+        plt.savefig(save_path, dpi=300)
+        plt.close()
 
 
 def image_transformation(img_path: str) -> dict:
@@ -119,7 +124,7 @@ def image_transformation(img_path: str) -> dict:
     homolog_pts, *_ = pseudo_landmarks_transformation(labeled_mask, img)
 
     # Apply Histogram of Color Repartition Transformation
-    _, hist_data = color_histogram_transformation(labeled_mask, img)
+    hist_figure, hist_data = color_histogram_transformation(labeled_mask, img)
 
     transformed_images = {
         "Original_Image": img,
@@ -187,7 +192,7 @@ def save_transformed_images(transformed_images, output_dir, img_path):
         if type == 'Pseudo_Landmarks' and element is not None:
             save_image_with_landmarks(transformed_images, save_path)
         elif type == 'Histogram':
-            pass
+            plot_histogram(element, save_path)
         elif isinstance(element, np.ndarray):
             if element.ndim == 2:  # grayscale or label
                 path = os.path.join(output_dir, f"{new_filename}")
@@ -224,7 +229,7 @@ if __name__ == "__main__":
         else:
             # Plot the 6 Image Transformations
             plot_transformations(transformed_images)
-            plot_histogram(hist_data = transformed_images.get("Histogram"))
+            plot_histogram(hist_data = transformed_images.get("Histogram"), save_path=None)
     else:
         if not output_dir:
             print("Error: You must specify a destination folder.")
