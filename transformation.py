@@ -37,34 +37,25 @@ def color_histogram_transformation(labeled_mask: np.ndarray, img: np.ndarray):
 
 
 def plot_transformations(img, blurred, mask, analysis, watershed, landmarks):
+    images = [img, blurred, mask, analysis, watershed, img]
+    titles = [
+        "Original Image",
+        "Gaussian Blur Transformation",
+        "Mask Transformation",
+        "Object Analysis Transformation",
+        "Watershed Segmentation Transformation",
+        "Acute Pseudo-Landmarks Transformation"
+    ]
+    cmaps = [None, 'gray', None, None, None, None]
+
     fig, ax = plt.subplots(3, 2, figsize=(12, 6))
     ax = ax.flatten()
 
-    ax[0].imshow(img)
-    ax[0].set_title("Original Image")
-    ax[0].axis('off')
+    for i, (image, title, cmap) in enumerate(zip(images, titles, cmaps)):
+        ax[i].imshow(image, cmap=cmap)
+        ax[i].set_title(title)
+        ax[i].axis('off')
 
-    ax[1].imshow(blurred, cmap='gray')
-    ax[1].set_title("Gaussian Blur Transformation")
-    ax[1].axis('off')
-
-    ax[2].imshow(mask)
-    ax[2].set_title("Mask Transformation")
-    ax[2].axis('off')
-
-    ax[3].imshow(analysis)
-    ax[3].set_title("Object Analysis Transformation")
-    ax[3].axis('off')
-
-    ax[4].imshow(watershed)
-    ax[4].set_title("Watershed Segmentation Transformation")
-    ax[4].axis('off')
-
-    ax[5].imshow(img)
-    ax[5].set_title("Acute Pseudo-Landmarks Transformation")
-    ax[5].axis('off')
-
-    # Plot the Landmarks
     homolog_pts = landmarks.reshape(-1, 2)
     for pt in homolog_pts:
         ax[5].plot(pt[0], pt[1], 'ro', markersize=3)
@@ -114,6 +105,7 @@ def image_transformation(img_path: str) -> None:
     # Apply Histogram of Color Repartition Transformation
     _, hist_data = color_histogram_transformation(labeled_mask, img)
 
+    # Plot the 6 Image Transformations
     plot_transformations(img, blurred, mask, object_analysis, color_labels, homolog_pts)
     plot_histogram(hist_data)
 
@@ -162,12 +154,11 @@ if __name__ == "__main__":
         print("Error: No images found in passed parameters.")
         sys.exit(1)
 
-    # If len(images_path) == 1, make destination folder optional
     if len(images_path) == 1 and not args.destination:
         # Set default destination folder if not provided
         args.destination = os.path.dirname(images_path[0])  # Use the source directory as destination
 
-    # Ensure output folder exists
+    # Ensure output folder exists, else create it
     if args.destination and not os.path.exists(args.destination):
         os.makedirs(args.destination)
 
