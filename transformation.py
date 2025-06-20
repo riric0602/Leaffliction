@@ -6,6 +6,7 @@ from matplotlib import pyplot as plt
 from plantcv import plantcv as pcv
 import cv2
 import warnings
+import json
 
 
 warnings.filterwarnings("ignore", category=RuntimeWarning)
@@ -36,8 +37,17 @@ def color_histogram_transformation(labeled_mask: np.ndarray, img: np.ndarray):
     return pcv.visualize.histogram(img=img, mask=labeled_mask, hist_data=True)
 
 
-def plot_transformations(img, blurred, mask, analysis, watershed, landmarks):
-    images = [img, blurred, mask, analysis, watershed, img]
+def plot_transformations(transformed_images):
+    img = transformed_images.get("Original_Image")
+
+    images = [
+        img,
+        transformed_images.get("Blurred"),
+        transformed_images.get("Mask"),
+        transformed_images.get("Object_Analysis"),
+        transformed_images.get("Watershed_Segmentation"),
+        img
+    ]
     titles = [
         "Original Image",
         "Gaussian Blur Transformation",
@@ -56,9 +66,10 @@ def plot_transformations(img, blurred, mask, analysis, watershed, landmarks):
         ax[i].set_title(title)
         ax[i].axis('off')
 
-    homolog_pts = landmarks.reshape(-1, 2)
-    for pt in homolog_pts:
-        ax[5].plot(pt[0], pt[1], 'ro', markersize=3)
+    landmarks = transformed_images.get("Pseudo_Landmarks")
+    if landmarks is not None:
+        for pt in landmarks.reshape(-1, 2):
+            ax[5].plot(pt[0], pt[1], 'ro', markersize=3)
 
     plt.tight_layout()
     plt.show()
@@ -67,7 +78,6 @@ def plot_transformations(img, blurred, mask, analysis, watershed, landmarks):
 def plot_histogram(hist_data):
     plt.figure(figsize=(10, 6))
 
-    # Plot per color channel
     for color in ['blue', 'green', 'red']:
         subset = hist_data[hist_data['color channel'] == color]
         plt.plot(subset['pixel intensity'], subset['hist_count'], color=color, label=f'{color} channel')
@@ -80,9 +90,9 @@ def plot_histogram(hist_data):
     plt.show()
 
 
-def image_transformation(img_path: str) -> None:
+def image_transformation(img_path: str) -> dict:
     # Load image and convert it to gray scale
-    img, path, filename = pcv.readimage(img_path)
+    img, path, _ = pcv.readimage(img_path)
     gray_img = pcv.rgb2gray_lab(rgb_img=img, channel='l')
     binary_img = pcv.threshold.binary(gray_img, threshold=120, object_type='dark')
 
@@ -105,11 +115,16 @@ def image_transformation(img_path: str) -> None:
     # Apply Histogram of Color Repartition Transformation
     _, hist_data = color_histogram_transformation(labeled_mask, img)
 
-    # Plot the 6 Image Transformations
-    plot_transformations(img, blurred, mask, object_analysis, color_labels, homolog_pts)
-    plot_histogram(hist_data)
-
-    return img
+    transformed_images = {
+        "Original_Image": img,
+        "Blurred": blurred,
+        "Mask": mask,
+        "Object_Analysis": object_analysis,
+        "Watershed_Segmentation": color_labels,
+        "Pseudo_Landmarks": homolog_pts,
+        "Histogram": hist_data,
+    }
+    return transformed_images
 
 
 def get_image_files(paths: list) -> list:
@@ -146,6 +161,21 @@ def argparse_flags() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def save_image_with_landmarks(transformed_images):
+    img = transformed_images.get("Original_Image")
+    landmarks = transformed_images.get("Pseudo_Landmarks")
+
+    for (x, y) in landmarks.reshape(-1, 2):
+        cv2.circle(img, (int(x), int(y)), radius=3, color=(255, 0, 0), thickness=-1)
+
+    # Convert RGB to BGR if needed before saving (OpenCV uses BGR)
+    if img.shape[2] == 3:
+        img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+
+    # Save the image
+    cv2.imwrite(save_path, img)
+
+
 if __name__ == "__main__":
     args = argparse_flags()
     images_path = get_image_files([args.source])
@@ -154,34 +184,44 @@ if __name__ == "__main__":
         print("Error: No images found in passed parameters.")
         sys.exit(1)
 
-    if len(images_path) == 1 and not args.destination:
-        # Set default destination folder if not provided
-        args.destination = os.path.dirname(images_path[0])  # Use the source directory as destination
-
     # Ensure output folder exists, else create it
     if args.destination and not os.path.exists(args.destination):
         os.makedirs(args.destination)
 
     if len(images_path) == 1:
-        # Set PlantCV debug output directory
-        pcv.params.debug = None
+        transformed_images = image_transformation(images_path[0])
+
         if args.destination:
-            pcv.params.debug_outdir = args.destination
+            output_dir = args.destination
 
-        # Process and plot the single image
-        transformed_image = image_transformation(images_path[0])
-        # Save the processed image
-        output_path = os.path.join(args.destination, f"transformed_{os.path.basename(images_path[0])}")
-        cv2.imwrite(output_path, transformed_image)  # Save the processed image
+            for type, element in transformed_images.items():
+                base_name = os.path.splitext(os.path.basename(images_path[0]))[0]
+                new_filename = f"{base_name}_{type}.JPG"
+                save_path = os.path.join(args.destination, new_filename)
+
+                if type == 'Pseudo_Landmarks':
+                    save_image_with_landmarks(transformed_images)
+                elif type == 'Histogram':
+                    pass
+                elif isinstance(element, np.ndarray):
+                    if element.ndim == 2:  # grayscale or label
+                        path = os.path.join(output_dir, f"{new_filename}")
+                        cv2.imwrite(path, element.astype(np.uint8))
+
+                    elif element.ndim == 3 and element.shape[2] == 3:  # RGB image
+                        bgr = cv2.cvtColor(element, cv2.COLOR_RGB2BGR)
+                        path = os.path.join(output_dir, f"{new_filename}")
+                        cv2.imwrite(path, bgr)
+        else:
+            # Plot the 6 Image Transformations
+            plot_transformations(transformed_images)
+            plot_histogram(hist_data = transformed_images.get("Histogram"))
+
     else:
-        # Set PlantCV debug output directory
-        pcv.params.debug = "print"
-        pcv.params.debug_outdir = args.destination
-
         for img_path in images_path:
-            transformed_image = image_transformation(img_path)
+            transformed_images = image_transformation(img_path)
             filename = os.path.basename(img_path)
 
             # Save the main transformed image
             output_path = os.path.join(args.destination, f"transformed_{filename}")
-            cv2.imwrite(output_path, transformed_image)  # Save the processed image
+            cv2.imwrite(output_path, transformed_images)
