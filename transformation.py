@@ -6,10 +6,17 @@ from matplotlib import pyplot as plt
 from plantcv import plantcv as pcv
 import cv2
 import warnings
-import json
-
+import math
 
 warnings.filterwarnings("ignore", category=RuntimeWarning)
+_original_acos = math.acos
+
+def safe_acos(x):
+    x = max(min(x, 1.0), -1.0)  # clamp to valid domain
+    return _original_acos(x)
+
+
+math.acos = safe_acos
 
 
 def mask_transformation(labeled_mask: np.ndarray, img: np.ndarray):
@@ -31,7 +38,6 @@ def watershed_segmentation_transformation(labeled_mask: np.ndarray, img: np.ndar
 
 def pseudo_landmarks_transformation(labeled_mask: np.ndarray, img: np.ndarray):
     return pcv.homology.acute(img=img, mask=labeled_mask, win=25, threshold=90)
-
 
 def color_histogram_transformation(labeled_mask: np.ndarray, img: np.ndarray):
     return pcv.visualize.histogram(img=img, mask=labeled_mask, hist_data=True)
@@ -58,7 +64,7 @@ def plot_transformations(transformed_images):
     ]
     cmaps = [None, 'gray', None, None, None, None]
 
-    fig, ax = plt.subplots(3, 2, figsize=(12, 6))
+    fig, ax = plt.subplots(3, 2, figsize=(10, 6))
     ax = ax.flatten()
 
     for i, (image, title, cmap) in enumerate(zip(images, titles, cmaps)):
@@ -161,67 +167,69 @@ def argparse_flags() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def save_image_with_landmarks(transformed_images):
+def save_image_with_landmarks(transformed_images, save_path):
     img = transformed_images.get("Original_Image")
     landmarks = transformed_images.get("Pseudo_Landmarks")
 
+    landmarks = np.array(landmarks)  # Ensure it's a NumPy array
     for (x, y) in landmarks.reshape(-1, 2):
-        cv2.circle(img, (int(x), int(y)), radius=3, color=(255, 0, 0), thickness=-1)
+        cv2.circle(img, (int(x), int(y)), radius=3, color=(0, 255, 0), thickness=-1)
 
-    # Convert RGB to BGR if needed before saving (OpenCV uses BGR)
-    if img.shape[2] == 3:
-        img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
-
-    # Save the image
     cv2.imwrite(save_path, img)
+
+
+def save_transformed_images(transformed_images, output_dir, img_path):
+    for type, element in transformed_images.items():
+        base_name = os.path.splitext(os.path.basename(img_path))[0]
+        new_filename = f"{base_name}_{type}.JPG"
+        save_path = os.path.join(args.destination, new_filename)
+
+        if type == 'Pseudo_Landmarks' and element is not None:
+            save_image_with_landmarks(transformed_images, save_path)
+        elif type == 'Histogram':
+            pass
+        elif isinstance(element, np.ndarray):
+            if element.ndim == 2:  # grayscale or label
+                path = os.path.join(output_dir, f"{new_filename}")
+                cv2.imwrite(path, element.astype(np.uint8))
+
+            elif element.ndim == 3 and element.shape[2] == 3:  # RGB image
+                bgr = cv2.cvtColor(element, cv2.COLOR_RGB2BGR)
+                path = os.path.join(output_dir, f"{new_filename}")
+                cv2.imwrite(path, bgr)
+
+            print(f"Saving {type} transformation for {img_path}")
 
 
 if __name__ == "__main__":
     args = argparse_flags()
     images_path = get_image_files([args.source])
+    output_dir = None
 
     if not images_path:
         print("Error: No images found in passed parameters.")
         sys.exit(1)
 
     # Ensure output folder exists, else create it
-    if args.destination and not os.path.exists(args.destination):
-        os.makedirs(args.destination)
+    if args.destination:
+        if not os.path.exists(args.destination):
+            os.makedirs(args.destination)
+        output_dir = args.destination
 
     if len(images_path) == 1:
         transformed_images = image_transformation(images_path[0])
 
         if args.destination:
-            output_dir = args.destination
-
-            for type, element in transformed_images.items():
-                base_name = os.path.splitext(os.path.basename(images_path[0]))[0]
-                new_filename = f"{base_name}_{type}.JPG"
-                save_path = os.path.join(args.destination, new_filename)
-
-                if type == 'Pseudo_Landmarks':
-                    save_image_with_landmarks(transformed_images)
-                elif type == 'Histogram':
-                    pass
-                elif isinstance(element, np.ndarray):
-                    if element.ndim == 2:  # grayscale or label
-                        path = os.path.join(output_dir, f"{new_filename}")
-                        cv2.imwrite(path, element.astype(np.uint8))
-
-                    elif element.ndim == 3 and element.shape[2] == 3:  # RGB image
-                        bgr = cv2.cvtColor(element, cv2.COLOR_RGB2BGR)
-                        path = os.path.join(output_dir, f"{new_filename}")
-                        cv2.imwrite(path, bgr)
+            save_transformed_images(transformed_images, output_dir, images_path[0])
         else:
             # Plot the 6 Image Transformations
             plot_transformations(transformed_images)
             plot_histogram(hist_data = transformed_images.get("Histogram"))
-
     else:
+        if not output_dir:
+            print("Error: You must specify a destination folder.")
+            sys.exit(1)
         for img_path in images_path:
+            print(f"Processing {img_path}")
             transformed_images = image_transformation(img_path)
-            filename = os.path.basename(img_path)
-
-            # Save the main transformed image
-            output_path = os.path.join(args.destination, f"transformed_{filename}")
-            cv2.imwrite(output_path, transformed_images)
+            save_transformed_images(transformed_images, output_dir, img_path)
