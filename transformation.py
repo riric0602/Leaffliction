@@ -2,8 +2,13 @@ import argparse
 import os
 import sys
 import numpy as np
+from matplotlib import pyplot as plt
 from plantcv import plantcv as pcv
 import cv2
+import warnings
+
+
+warnings.filterwarnings("ignore", category=RuntimeWarning)
 
 
 def mask_transformation(labeled_mask: np.ndarray, img: np.ndarray):
@@ -18,38 +23,11 @@ def object_analysis_transformation(labeled_mask: np.ndarray, img: np.ndarray):
     return pcv.analyze.size(img=img, labeled_mask=labeled_mask, n_labels=1)
 
 
-# def image_transformation(img_path: str) -> None:
-#     # Load image and convert it to gray scale
-#     img, path, filename = pcv.readimage(img_path)
-#     gray_img = pcv.rgb2gray_lab(rgb_img=img, channel='l')
-#     binary_img = pcv.threshold.binary(gray_img, threshold=120, object_type='light')
-#
-#     # Apply Gaussian blur transformation
-#     blurred = gaussian_blur_transformation(gray_img)
-#
-#     # Apply Mask transformation
-#     labeled_mask = pcv.fill(bin_img=binary_img, size=50)
-#     mask = mask_transformation(labeled_mask, img)
-#
-#     # Apply Object Analysis transformation
-#     shape_img = object_analysis_transformation(labeled_mask, img)
-#
-#     # Apply Object Boundaries transformation
-#     analysis_images = pcv.watershed_segmentation(rgb_img=img, mask=labeled_mask, distance=15, label="default")
-#
-#     # Apply Pseudo-Landmarks transformation
-#     homolog_pts, start_pts, stop_pts, ptvals, chain, max_dist = pcv.homology.acute(img=img, mask=labeled_mask, win=25,
-#                                                                                    threshold=90)
-#
-#     # Apply Histogram of Color Repartition Transformation
-#     hist_figure, hist_data = pcv.visualize.histogram(img=img, mask=labeled_mask, hist_data=True)
-
-
 def image_transformation(img_path: str) -> None:
     # Load image and convert it to gray scale
     img, path, filename = pcv.readimage(img_path)
     gray_img = pcv.rgb2gray_lab(rgb_img=img, channel='l')
-    binary_img = pcv.threshold.binary(gray_img, threshold=120, object_type='light')
+    binary_img = pcv.threshold.binary(gray_img, threshold=120, object_type='dark')
 
     # Apply Gaussian blur transformation
     blurred = gaussian_blur_transformation(gray_img)
@@ -59,19 +37,68 @@ def image_transformation(img_path: str) -> None:
     mask = mask_transformation(labeled_mask, img)
 
     # Apply Object Analysis transformation
-    shape_img = object_analysis_transformation(labeled_mask, img)
+    object_analysis = object_analysis_transformation(labeled_mask, img)
 
-    # Apply Object Boundaries transformation
-    analysis_images = pcv.watershed_segmentation(rgb_img=img, mask=labeled_mask, distance=15, label="default")
+    # Apply Watershed Segmentation transformation
+    watershed = pcv.watershed_segmentation(rgb_img=img, mask=labeled_mask, distance=15, label="default")
+    color_labels = pcv.visualize.colorize_label_img(label_img=watershed)
 
     # Apply Pseudo-Landmarks transformation
     homolog_pts, start_pts, stop_pts, ptvals, chain, max_dist = pcv.homology.acute(img=img, mask=labeled_mask, win=25,
                                                                                    threshold=90)
+    # Plot original image and colorized labels side by side
+    fig, ax = plt.subplots(3, 2, figsize=(12, 6))
+    ax = ax.flatten()
+
+    ax[0].imshow(img)
+    ax[0].set_title("Original Image")
+    ax[0].axis('off')
+
+    ax[1].imshow(blurred, cmap='gray')
+    ax[1].set_title("Gaussian Blur Transformation")
+    ax[1].axis('off')
+
+    ax[2].imshow(mask)
+    ax[2].set_title("Mask Transformation")
+    ax[2].axis('off')
+
+    ax[3].imshow(object_analysis)
+    ax[3].set_title("Object Analysis Transformation")
+    ax[3].axis('off')
+
+    ax[4].imshow(color_labels)
+    ax[4].set_title("Watershed Segmentation Transformation")
+    ax[4].axis('off')
+
+    ax[5].imshow(img)
+    ax[5].set_title("Acute Pseudo-Landmarks Transformation")
+    ax[5].axis('off')
+
+    # Plot the Landmarks
+    homolog_pts = homolog_pts.reshape(-1, 2)
+    for pt in homolog_pts:
+        ax[5].plot(pt[0], pt[1], 'ro', markersize=3)
+
+    plt.tight_layout()
+    plt.show()
 
     # Apply Histogram of Color Repartition Transformation
     hist_figure, hist_data = pcv.visualize.histogram(img=img, mask=labeled_mask, hist_data=True)
+    plt.figure(figsize=(10, 6))
 
-    return img  # return the transformed image for saving
+    # Plot per color channel
+    for color in ['blue', 'green', 'red']:
+        subset = hist_data[hist_data['color channel'] == color]
+        plt.plot(subset['pixel intensity'], subset['hist_count'], color=color, label=f'{color} channel')
+
+    plt.xlabel('Pixel Intensity')
+    plt.ylabel('Count')
+    plt.title('Histogram of Pixel Intensities by Color Channel')
+    plt.legend()
+    plt.grid(True)
+    plt.show()
+
+    return img
 
 
 def get_image_files(paths: list) -> list:
@@ -96,31 +123,15 @@ def get_image_files(paths: list) -> list:
     return image_paths
 
 
-# def argparse_flags() -> argparse.Namespace:
-#     """
-#     Parse command line arguments
-#     :return: args passed in command line
-#     """
-#     parser = argparse.ArgumentParser(
-#         description="Display 6 types of data transformation for images"
-#     )
-#
-#     parser.add_argument(
-#         "paths",
-#         nargs='+',
-#         type=str,
-#         help="One or more images or folders containing images"
-#     )
-#
-#     parsed_args = parser.parse_args()
-#     return parsed_args
-
-
-def argparse_flags():
-    """Parse the command-line arguments."""
-    parser = argparse.ArgumentParser(description="Image Augmentation and Processing")
+def argparse_flags() -> argparse.Namespace:
+    """
+    Parse the command-line arguments.
+    :return: parsed commandline arguments
+    """
+    parser = argparse.ArgumentParser(description="Display 6 types of Image Transformation")
     parser.add_argument('-src', '--source', type=str, required=True, help="Input file or directory")
     parser.add_argument('-dst', '--destination', type=str, help="Output folder (optional if only one image)")
+
     return parser.parse_args()
 
 
@@ -143,8 +154,9 @@ if __name__ == "__main__":
 
     if len(images_path) == 1:
         # Set PlantCV debug output directory
-        pcv.params.debug = "plot"
-        pcv.params.debug_outdir = args.destination
+        pcv.params.debug = None
+        if args.destination:
+            pcv.params.debug_outdir = args.destination
 
         # Process and plot the single image
         transformed_image = image_transformation(images_path[0])
