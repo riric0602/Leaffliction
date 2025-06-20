@@ -23,6 +23,72 @@ def object_analysis_transformation(labeled_mask: np.ndarray, img: np.ndarray):
     return pcv.analyze.size(img=img, labeled_mask=labeled_mask, n_labels=1)
 
 
+def watershed_segmentation_transformation(labeled_mask: np.ndarray, img: np.ndarray):
+    watershed = pcv.watershed_segmentation(rgb_img=img, mask=labeled_mask, distance=15, label="default")
+    return pcv.visualize.colorize_label_img(label_img=watershed)
+
+
+def pseudo_landmarks_transformation(labeled_mask: np.ndarray, img: np.ndarray):
+    return pcv.homology.acute(img=img, mask=labeled_mask, win=25, threshold=90)
+
+
+def color_histogram_transformation(labeled_mask: np.ndarray, img: np.ndarray):
+    return pcv.visualize.histogram(img=img, mask=labeled_mask, hist_data=True)
+
+
+def plot_transformations(img, blurred, mask, analysis, watershed, landmarks):
+    fig, ax = plt.subplots(3, 2, figsize=(12, 6))
+    ax = ax.flatten()
+
+    ax[0].imshow(img)
+    ax[0].set_title("Original Image")
+    ax[0].axis('off')
+
+    ax[1].imshow(blurred, cmap='gray')
+    ax[1].set_title("Gaussian Blur Transformation")
+    ax[1].axis('off')
+
+    ax[2].imshow(mask)
+    ax[2].set_title("Mask Transformation")
+    ax[2].axis('off')
+
+    ax[3].imshow(analysis)
+    ax[3].set_title("Object Analysis Transformation")
+    ax[3].axis('off')
+
+    ax[4].imshow(watershed)
+    ax[4].set_title("Watershed Segmentation Transformation")
+    ax[4].axis('off')
+
+    ax[5].imshow(img)
+    ax[5].set_title("Acute Pseudo-Landmarks Transformation")
+    ax[5].axis('off')
+
+    # Plot the Landmarks
+    homolog_pts = landmarks.reshape(-1, 2)
+    for pt in homolog_pts:
+        ax[5].plot(pt[0], pt[1], 'ro', markersize=3)
+
+    plt.tight_layout()
+    plt.show()
+
+
+def plot_histogram(hist_data):
+    plt.figure(figsize=(10, 6))
+
+    # Plot per color channel
+    for color in ['blue', 'green', 'red']:
+        subset = hist_data[hist_data['color channel'] == color]
+        plt.plot(subset['pixel intensity'], subset['hist_count'], color=color, label=f'{color} channel')
+
+    plt.xlabel('Pixel Intensity')
+    plt.ylabel('Count')
+    plt.title('Histogram of Pixel Intensities by Color Channel')
+    plt.legend()
+    plt.grid(True)
+    plt.show()
+
+
 def image_transformation(img_path: str) -> None:
     # Load image and convert it to gray scale
     img, path, filename = pcv.readimage(img_path)
@@ -40,63 +106,16 @@ def image_transformation(img_path: str) -> None:
     object_analysis = object_analysis_transformation(labeled_mask, img)
 
     # Apply Watershed Segmentation transformation
-    watershed = pcv.watershed_segmentation(rgb_img=img, mask=labeled_mask, distance=15, label="default")
-    color_labels = pcv.visualize.colorize_label_img(label_img=watershed)
+    color_labels = watershed_segmentation_transformation(labeled_mask, img)
 
     # Apply Pseudo-Landmarks transformation
-    homolog_pts, start_pts, stop_pts, ptvals, chain, max_dist = pcv.homology.acute(img=img, mask=labeled_mask, win=25,
-                                                                                   threshold=90)
-    # Plot original image and colorized labels side by side
-    fig, ax = plt.subplots(3, 2, figsize=(12, 6))
-    ax = ax.flatten()
-
-    ax[0].imshow(img)
-    ax[0].set_title("Original Image")
-    ax[0].axis('off')
-
-    ax[1].imshow(blurred, cmap='gray')
-    ax[1].set_title("Gaussian Blur Transformation")
-    ax[1].axis('off')
-
-    ax[2].imshow(mask)
-    ax[2].set_title("Mask Transformation")
-    ax[2].axis('off')
-
-    ax[3].imshow(object_analysis)
-    ax[3].set_title("Object Analysis Transformation")
-    ax[3].axis('off')
-
-    ax[4].imshow(color_labels)
-    ax[4].set_title("Watershed Segmentation Transformation")
-    ax[4].axis('off')
-
-    ax[5].imshow(img)
-    ax[5].set_title("Acute Pseudo-Landmarks Transformation")
-    ax[5].axis('off')
-
-    # Plot the Landmarks
-    homolog_pts = homolog_pts.reshape(-1, 2)
-    for pt in homolog_pts:
-        ax[5].plot(pt[0], pt[1], 'ro', markersize=3)
-
-    plt.tight_layout()
-    plt.show()
+    homolog_pts, *_ = pseudo_landmarks_transformation(labeled_mask, img)
 
     # Apply Histogram of Color Repartition Transformation
-    hist_figure, hist_data = pcv.visualize.histogram(img=img, mask=labeled_mask, hist_data=True)
-    plt.figure(figsize=(10, 6))
+    _, hist_data = color_histogram_transformation(labeled_mask, img)
 
-    # Plot per color channel
-    for color in ['blue', 'green', 'red']:
-        subset = hist_data[hist_data['color channel'] == color]
-        plt.plot(subset['pixel intensity'], subset['hist_count'], color=color, label=f'{color} channel')
-
-    plt.xlabel('Pixel Intensity')
-    plt.ylabel('Count')
-    plt.title('Histogram of Pixel Intensities by Color Channel')
-    plt.legend()
-    plt.grid(True)
-    plt.show()
+    plot_transformations(img, blurred, mask, object_analysis, color_labels, homolog_pts)
+    plot_histogram(hist_data)
 
     return img
 
