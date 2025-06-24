@@ -1,9 +1,9 @@
 import argparse
 import os
-
-import tensorflow as tf
 import numpy as np
 import sys
+import json
+import tensorflow as tf
 
 
 batch_size = 32
@@ -39,24 +39,15 @@ if __name__ == "__main__":
             print("Error: Image path does not exist.")
             sys.exit(1)
 
-        if not os.path.exists("leaffliction_model.keras"):
+        if not os.path.exists("leaffliction_model.keras") or not os.path.exists("class_names.json"):
             print(
-                "Error: Model not found. Train the model before prediction."
+                "Error: Model/Classes not found. Train the model before prediction."
             )
             sys.exit(1)
 
         model = tf.keras.models.load_model("leaffliction_model.keras")
-
-        class_names = [
-            'Apple_Black_rot',
-            'Apple_healthy',
-            'Apple_rust',
-            'Apple_scab',
-            'Grape_Black_rot',
-            'Grape_Esca',
-            'Grape_healthy',
-            'Grape_spot'
-        ]
+        with open("class_names.json", "r") as f:
+            class_names = json.load(f)
 
         img = tf.keras.utils.load_img(
             image_path, target_size=(img_height, img_width)
