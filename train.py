@@ -162,10 +162,6 @@ if __name__ == "__main__":
             sys.exit(1)
 
         image_paths = get_image_files([data_path])
-
-        for path in image_paths:
-            image_augmentation(path)
-
         data_dir = pathlib.Path(data_path)
 
         # Create and save training and validation datasets

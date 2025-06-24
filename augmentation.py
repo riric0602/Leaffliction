@@ -141,12 +141,19 @@ if __name__ == "__main__":
             min_count = min(len(dataset_images) for dataset_images in values)
 
             # Augment each class
-            for folder, dataset_images in folder_to_images.items():
-                if len(dataset_images) > min_count:
-                    selected = random.sample(dataset_images, min_count)
-                else:
-                    selected = dataset_images
-
+            for folder, imgs in folder_to_images.items():
+                class_name = os.path.basename(folder)
+                selected = set(random.sample(imgs, min_count)) if len(imgs) > min_count else set(imgs)
+                extras = set(imgs) - selected
+                for path in extras:
+                    if os.path.exists(path):
+                        try:
+                            os.remove(path)
+                            print(f"Deleted extra: {os.path.basename(path)}")
+                        except Exception as e:
+                            print(f"Failed to delete {path}: {e}")
+                    else:
+                        print(f"File already missing, skipped deletion: {path}")
                 for img_path in selected:
                     image_augmentation(img_path)
 
