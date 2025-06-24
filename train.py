@@ -5,6 +5,7 @@ import numpy as np
 from tensorflow import keras
 from tensorflow.keras import layers
 from tensorflow.keras.models import Sequential
+import sys
 
 
 batch_size = 32
@@ -57,86 +58,81 @@ def standardize_and_configure_data(train_ds, val_ds):
 
 
 if __name__ == "__main__":
-    # Load leaves dataset
-    data_dir = pathlib.Path("./leaves/images")
+    try:
+        # Load leaves dataset
+        data_dir = pathlib.Path("./leaves/images")
 
-    image_count = len(list(data_dir.glob('*/*.JPG')))
-    print(f"Image count in dataset: {image_count}")
+        image_count = len(list(data_dir.glob('*/*.JPG')))
+        print(f"Image count in dataset: {image_count}")
 
-    # Retrieve training and validation dataset
-    train_ds, val_ds = set_training_validation_dataset(data_dir)
-    class_names = train_ds.class_names
-    print(f"Training Class Names: {class_names}")
+        # Retrieve training and validation dataset
+        train_ds, val_ds = set_training_validation_dataset(data_dir)
+        class_names = train_ds.class_names
+        print(f"Training Class Names: {class_names}")
 
-    # Visualize some data from the training set
-    plt.figure(figsize=(10, 10))
-    for images, labels in train_ds.take(1):
-        for i in range(9):
-            ax = plt.subplot(3, 3, i + 1)
-            plt.imshow(images[i].numpy().astype("uint8"))
-            plt.title(class_names[labels[i]])
-            plt.axis("off")
-    plt.suptitle("Random 9 Images from the Training Set", fontsize=20)
-    plt.tight_layout(rect=[0, 0, 1, 0.95])  # Leave space for the big title
-    plt.show()
+        train_ds, val_ds = standardize_and_configure_data(train_ds, val_ds)
 
-    train_ds, val_ds = standardize_and_configure_data(train_ds, val_ds)
+        # Create the model
+        print("Creating the model...")
+        num_classes = len(class_names)
 
-    # Create the model
-    print("Creating the model...")
-    num_classes = len(class_names)
+        model = Sequential([
+            keras.Input(shape=(img_height, img_width, 3)),
+            layers.Rescaling(1. / 255),
+            layers.Conv2D(16, 3, padding='same', activation='relu'),
+            layers.MaxPooling2D(),
+            layers.Conv2D(32, 3, padding='same', activation='relu'),
+            layers.MaxPooling2D(),
+            layers.Conv2D(64, 3, padding='same', activation='relu'),
+            layers.MaxPooling2D(),
+            layers.Flatten(),
+            layers.Dense(128, activation='relu'),
+            layers.Dense(num_classes)
+        ])
 
-    model = Sequential([
-        keras.Input(shape=(img_height, img_width, 3)),
-        layers.Rescaling(1. / 255),
-        layers.Conv2D(16, 3, padding='same', activation='relu'),
-        layers.MaxPooling2D(),
-        layers.Conv2D(32, 3, padding='same', activation='relu'),
-        layers.MaxPooling2D(),
-        layers.Conv2D(64, 3, padding='same', activation='relu'),
-        layers.MaxPooling2D(),
-        layers.Flatten(),
-        layers.Dense(128, activation='relu'),
-        layers.Dense(num_classes)
-    ])
+        model.compile(optimizer='adam',
+                      loss=tf.keras.losses.SparseCategoricalCrossentropy(
+                          from_logits=True
+                      ),
+                      metrics=['accuracy'])
 
-    model.compile(optimizer='adam',
-                  loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
-                  metrics=['accuracy'])
+        model.summary()
 
-    model.summary()
+        # Training the model
+        print("Training the model...")
+        epochs = 10
+        history = model.fit(
+            train_ds,
+            validation_data=val_ds,
+            epochs=epochs
+        )
 
-    # Training the model
-    print("Training the model...")
-    epochs = 10
-    history = model.fit(
-        train_ds,
-        validation_data=val_ds,
-        epochs=epochs
-    )
+        model.save("leaffliction_model.keras")
 
-    model.save("leaffliction_model.keras")
+        # Visualize training results
+        print("Visualizing model training accuracy...")
+        acc = history.history['accuracy']
+        val_acc = history.history['val_accuracy']
 
-    # Visualize training results
-    print("Visualizing model training accuracy...")
-    acc = history.history['accuracy']
-    val_acc = history.history['val_accuracy']
+        loss = history.history['loss']
+        val_loss = history.history['val_loss']
 
-    loss = history.history['loss']
-    val_loss = history.history['val_loss']
+        epochs_range = range(epochs)
 
-    epochs_range = range(epochs)
+        plt.figure(figsize=(8, 8))
+        plt.subplot(1, 2, 1)
+        plt.plot(epochs_range, acc, label='Training Accuracy')
+        plt.plot(epochs_range, val_acc, label='Validation Accuracy')
+        plt.legend(loc='lower right')
+        plt.title('Training and Validation Accuracy')
 
-    plt.figure(figsize=(8, 8))
-    plt.subplot(1, 2, 1)
-    plt.plot(epochs_range, acc, label='Training Accuracy')
-    plt.plot(epochs_range, val_acc, label='Validation Accuracy')
-    plt.legend(loc='lower right')
-    plt.title('Training and Validation Accuracy')
+        plt.subplot(1, 2, 2)
+        plt.plot(epochs_range, loss, label='Training Loss')
+        plt.plot(epochs_range, val_loss, label='Validation Loss')
+        plt.legend(loc='upper right')
+        plt.title('Training and Validation Loss')
+        plt.show()
 
-    plt.subplot(1, 2, 2)
-    plt.plot(epochs_range, loss, label='Training Loss')
-    plt.plot(epochs_range, val_loss, label='Validation Loss')
-    plt.legend(loc='upper right')
-    plt.title('Training and Validation Loss')
-    plt.show()
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        sys.exit(1)

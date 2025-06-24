@@ -148,17 +148,22 @@ def argparse_flags() -> argparse.Namespace:
 
 
 if __name__ == "__main__":
-    args = argparse_flags()
-    images_path = get_image_files(args.paths)
+    try:
+        args = argparse_flags()
+        images_path = get_image_files(args.paths)
 
-    if not images_path:
-        print("Error: No images found in passed parameters.")
+        if not images_path:
+            print("Error: No images found in passed parameters.")
+            sys.exit(1)
+
+        if len(images_path) == 1:
+            # Display augmentations if only one image is processed
+            augmented_images = image_augmentation(images_path[0])
+            plot_image_augmentation(augmented_images)
+        else:
+            for img_path in images_path:
+                image_augmentation(img_path)
+
+    except Exception as e:
+        print(f"An error occurred: {e}")
         sys.exit(1)
-
-    if len(images_path) == 1:
-        # Display augmentations if only one image is processed
-        augmented_images = image_augmentation(images_path[0])
-        plot_image_augmentation(augmented_images)
-    else:
-        for img_path in images_path:
-            image_augmentation(img_path)

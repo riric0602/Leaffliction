@@ -118,11 +118,16 @@ def argparse_flags() -> argparse.Namespace:
 
 
 if __name__ == "__main__":
-    args = argparse_flags()
-    dataset_path = args.path
+    try:
+        args = argparse_flags()
+        dataset_path = args.path
 
-    if os.path.isdir(dataset_path):
-        analyze_dataset(dataset_path)
-    else:
-        print(f"Error: {dataset_path} is not a valid directory.")
+        if os.path.isdir(dataset_path):
+            analyze_dataset(dataset_path)
+        else:
+            print(f"Error: {dataset_path} is not a valid directory.")
+            sys.exit(1)
+
+    except Exception as e:
+        print(f"An error occurred: {e}")
         sys.exit(1)
