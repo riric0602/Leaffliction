@@ -5,7 +5,7 @@ import cv2
 import albumentations as A
 import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib.backend_bases import KeyEvent
+from utils import close_on_key, get_image_files
 
 
 def plot_image_augmentation(augmented_images: list) -> None:
@@ -26,16 +26,6 @@ def plot_image_augmentation(augmented_images: list) -> None:
     plt.tight_layout()
     plt.suptitle("Data Augmentation For Image", fontsize=18)
     plt.show()
-
-
-def close_on_key(event: KeyEvent) -> None:
-    """
-    Close the window when the ESC key is pressed
-    :param event: keyboard event
-    :return:
-    """
-    if event.key == 'escape':
-        plt.close(event.canvas.figure)
 
 
 def augment_image(image: np.ndarray, augmentations: list, path: str) -> list:
@@ -103,28 +93,6 @@ def image_augmentation(img_path: str) -> list:
 
     augmented_images = augment_image(image, augmentations, img_path)
     return augmented_images
-
-
-def get_image_files(paths: list) -> list:
-    """
-    Extract Image files from CLI arguments
-    :param paths: paths passed in parameters
-    :return: paths of the images in the parameters
-    """
-    image_paths = []
-
-    for path in paths:
-        if os.path.isfile(path):
-            if path.lower().endswith((".jpg", ".jpeg", ".png")):
-                # Check if element is a file and an image
-                image_paths.append(path)
-        elif os.path.isdir(path):
-            # Check if element is a directory containing images
-            for root, _, files in os.walk(path):
-                for file in files:
-                    if file.lower().endswith((".jpg", ".jpeg", ".png")):
-                        image_paths.append(os.path.join(root, file))
-    return image_paths
 
 
 def argparse_flags() -> argparse.Namespace:

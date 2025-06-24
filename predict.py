@@ -4,11 +4,36 @@ import numpy as np
 import sys
 import json
 import tensorflow as tf
-
+import matplotlib.pyplot as plt
+from matplotlib import image as mpimg
+import cv2
 
 batch_size = 32
 img_height = 180
 img_width = 180
+
+
+def get_transformed_image(original_image):
+    # Convert PIL image to OpenCV format
+    original_cv = cv2.cvtColor(np.array(original_image), cv2.COLOR_RGB2BGR)
+
+    # Convert to HSV color space for better color filtering
+    hsv = cv2.cvtColor(original_cv, cv2.COLOR_BGR2HSV)
+
+    # Define range for green color in HSV
+    lower_green = np.array([25, 40, 40])
+    upper_green = np.array([90, 255, 255])
+
+    # Create mask to isolate green parts (i.e., leaf)
+    mask = cv2.inRange(hsv, lower_green, upper_green)
+
+    # Apply the mask on the original image
+    highlighted = cv2.bitwise_and(original_cv, original_cv, mask=mask)
+
+    # Convert back to RGB for displaying with matplotlib
+    transformed_image = cv2.cvtColor(highlighted, cv2.COLOR_BGR2RGB)
+
+    return transformed_image
 
 
 def argparse_flags() -> argparse.Namespace:
@@ -34,21 +59,24 @@ if __name__ == "__main__":
     try:
         args = argparse_flags()
         image_path = args.path
+        image_name = os.path.basename(image_path)
 
         if not os.path.exists(image_path):
             print("Error: Image path does not exist.")
             sys.exit(1)
 
         if not os.path.exists("leaffliction_model.keras") or not os.path.exists("class_names.json"):
-            print(
-                "Error: Model/Classes not found. Train the model before prediction."
-            )
+            print("Error: Model/Classes not found. Train the model before prediction.")
             sys.exit(1)
 
         model = tf.keras.models.load_model("leaffliction_model.keras")
         with open("class_names.json", "r") as f:
             class_names = json.load(f)
 
+        # Load original image for display
+        original_img = mpimg.imread(image_path)
+
+        # Load and preprocess image for model
         img = tf.keras.utils.load_img(
             image_path, target_size=(img_height, img_width)
         )
@@ -56,12 +84,27 @@ if __name__ == "__main__":
         img_array = tf.expand_dims(img_array, 0)
 
         predictions = model.predict(img_array)
-        score = tf.nn.softmax(predictions[0])
 
-        print(
-            "This image {} most likely belongs to {} with a {:.2f} percent confidence."
-            .format(image_path, class_names[np.argmax(score)], 100 * np.max(score))
-        )
+        score = tf.nn.softmax(predictions[0])
+        predicted_class = class_names[np.argmax(score)]
+        confidence = 100 * np.max(score)
+
+        transformed_image = get_transformed_image(img)
+
+        # Plot both images and prediction
+        fig, axes = plt.subplots(1, 2, figsize=(10, 5))
+
+        axes[0].imshow(original_img)
+        axes[0].set_title(f"Original Image {image_name}")
+        axes[0].axis("off")
+
+        axes[1].imshow(transformed_image)
+        axes[1].set_title("Transformed Image")
+        axes[1].axis("off")
+
+        plt.suptitle(f"Predicted: {predicted_class} ({confidence:.2f}%)", fontsize=14)
+        plt.tight_layout()
+        plt.show()
 
     except Exception as e:
         print(f"An error occurred: {e}")

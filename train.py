@@ -11,6 +11,8 @@ from tensorflow import keras
 from tensorflow.keras import layers
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.callbacks import History
+from augmentation import image_augmentation
+from utils import get_image_files
 
 
 batch_size = 32
@@ -158,6 +160,11 @@ if __name__ == "__main__":
         if not os.path.exists(data_path):
             print(f"Error: Directory {data_path} doesn't exist")
             sys.exit(1)
+
+        image_paths = get_image_files([data_path])
+
+        for path in image_paths:
+            image_augmentation(path)
 
         data_dir = pathlib.Path(data_path)
 
