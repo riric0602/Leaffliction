@@ -7,6 +7,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 from utils import close_on_key, get_image_files
 
+from collections import defaultdict
+import random
+
 
 def plot_image_augmentation(augmented_images: list) -> None:
     """
@@ -129,8 +132,23 @@ if __name__ == "__main__":
             augmented_images = image_augmentation(images_path[0])
             plot_image_augmentation(augmented_images)
         else:
-            for img_path in images_path:
-                image_augmentation(img_path)
+            folder_to_images = defaultdict(list)
+            for path in images_path:
+                folder_to_images[os.path.dirname(path)].append(path)
+
+            # Select minimum count of images to balance dataset
+            values = folder_to_images.values()
+            min_count = min(len(dataset_images) for dataset_images in values)
+
+            # Augment each class
+            for folder, dataset_images in folder_to_images.items():
+                if len(dataset_images) > min_count:
+                    selected = random.sample(dataset_images, min_count)
+                else:
+                    selected = dataset_images
+
+                for img_path in selected:
+                    image_augmentation(img_path)
 
     except Exception as e:
         print(f"An error occurred: {e}")
