@@ -3,11 +3,12 @@ import os
 import sys
 import numpy as np
 from matplotlib import pyplot as plt
-from matplotlib.backend_bases import KeyEvent
 from plantcv import plantcv as pcv
 import cv2
 import warnings
 import math
+from utils import close_on_key, get_image_files
+
 
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 _original_acos = math.acos
@@ -19,16 +20,6 @@ def safe_acos(x):
 
 
 math.acos = safe_acos
-
-
-def close_on_key(event: KeyEvent) -> None:
-    """
-    Close the window when the ESC key is pressed
-    :param event: keyboard event
-    :return:
-    """
-    if event.key == 'escape':
-        plt.close(event.canvas.figure)
 
 
 def mask_transformation(labeled_mask: np.ndarray, img: np.ndarray):
@@ -218,28 +209,6 @@ def image_transformation(img_path: str) -> dict:
     return transformed_images
 
 
-def get_image_files(paths: list) -> list:
-    """
-    Extract Image files from CLI arguments
-    :param paths: paths passed in parameters
-    :return: paths of the images in the parameters
-    """
-    image_paths = []
-
-    for path in paths:
-        if os.path.isfile(path):
-            if path.lower().endswith((".jpg", ".jpeg", ".png")):
-                # Check if element is a file and an image
-                image_paths.append(path)
-        elif os.path.isdir(path):
-            # Check if element is a directory containing images
-            for root, _, files in os.walk(path):
-                for file in files:
-                    if file.lower().endswith((".jpg", ".jpeg", ".png")):
-                        image_paths.append(os.path.join(root, file))
-    return image_paths
-
-
 def argparse_flags() -> argparse.Namespace:
     """
     Parse the command-line arguments.
@@ -288,7 +257,7 @@ def save_image_with_landmarks(transformed_images, save_path):
     cv2.imwrite(save_path, img)
 
 
-def save_transformed_images(transformed_images, output_dir, img_path):
+def save_images(transformed_images, output_dir, img_path):
     """
     Save the transformed images in output_dir
     :param transformed_images: dictionary with transformed images
@@ -319,40 +288,45 @@ def save_transformed_images(transformed_images, output_dir, img_path):
 
 
 if __name__ == "__main__":
-    args = argparse_flags()
-    images_path = get_image_files([args.source])
-    output_dir = None
+    try:
+        args = argparse_flags()
+        images_path = get_image_files([args.source])
+        output_dir = None
 
-    if not images_path:
-        print("Error: No images found in passed parameters.")
-        sys.exit(1)
-
-    # Ensure output folder exists, else create it
-    if args.destination:
-        if not os.path.exists(args.destination):
-            os.makedirs(args.destination)
-        output_dir = args.destination
-
-    if len(images_path) == 1:
-        transformed_images = image_transformation(images_path[0])
-
-        if args.destination:
-            save_transformed_images(
-                transformed_images,
-                output_dir,
-                images_path[0]
-            )
-        else:
-            # Plot the 6 Image Transformations
-            plot_transformations(transformed_images)
-            plot_histogram(
-                hist_data=transformed_images.get("Histogram"),
-                save_path=None
-            )
-    else:
-        if not output_dir:
-            print("Error: You must specify a destination folder.")
+        if not images_path:
+            print("Error: No images found in passed parameters.")
             sys.exit(1)
-        for img_path in images_path:
-            transformed_images = image_transformation(img_path)
-            save_transformed_images(transformed_images, output_dir, img_path)
+
+        # Ensure output folder exists, else create it
+        if args.destination:
+            if not os.path.exists(args.destination):
+                os.makedirs(args.destination)
+            output_dir = args.destination
+
+        if len(images_path) == 1:
+            transformed_images = image_transformation(images_path[0])
+
+            if args.destination:
+                save_images(
+                    transformed_images,
+                    output_dir,
+                    images_path[0]
+                )
+            else:
+                # Plot the 6 Image Transformations
+                plot_transformations(transformed_images)
+                plot_histogram(
+                    hist_data=transformed_images.get("Histogram"),
+                    save_path=None
+                )
+        else:
+            if not output_dir:
+                print("Error: You must specify a destination folder.")
+                sys.exit(1)
+            for img_path in images_path:
+                transformed_images = image_transformation(img_path)
+                save_images(transformed_images, output_dir, img_path)
+
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        sys.exit(1)

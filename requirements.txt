@@ -1,7 +1,10 @@
 flake8==7.2.0
 matplotlib==3.10.3
 albumentations==2.0.8
-numpy==2.2.6
+numpy==1.26.0
 opencv-python==4.11.0.86
 plantcv==4.3.1
 ipython==8.37.0
+tensorflow==2.19.0
+pillow==11.2.1
+wget==3.2

@@ -5,7 +5,10 @@ import cv2
 import albumentations as A
 import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib.backend_bases import KeyEvent
+from utils import close_on_key, get_image_files
+
+from collections import defaultdict
+import random
 
 
 def plot_image_augmentation(augmented_images: list) -> None:
@@ -26,16 +29,6 @@ def plot_image_augmentation(augmented_images: list) -> None:
     plt.tight_layout()
     plt.suptitle("Data Augmentation For Image", fontsize=18)
     plt.show()
-
-
-def close_on_key(event: KeyEvent) -> None:
-    """
-    Close the window when the ESC key is pressed
-    :param event: keyboard event
-    :return:
-    """
-    if event.key == 'escape':
-        plt.close(event.canvas.figure)
 
 
 def augment_image(image: np.ndarray, augmentations: list, path: str) -> list:
@@ -63,7 +56,6 @@ def augment_image(image: np.ndarray, augmentations: list, path: str) -> list:
             save_path,
             cv2.cvtColor(augmented_image, cv2.COLOR_RGB2BGR)
         )
-        print(f"Saving {new_filename} in directory {base_dir}.")
 
     return augmented_images
 
@@ -105,28 +97,6 @@ def image_augmentation(img_path: str) -> list:
     return augmented_images
 
 
-def get_image_files(paths: list) -> list:
-    """
-    Extract Image files from CLI arguments
-    :param paths: paths passed in parameters
-    :return: paths of the images in the parameters
-    """
-    image_paths = []
-
-    for path in paths:
-        if os.path.isfile(path):
-            if path.lower().endswith((".jpg", ".jpeg", ".png")):
-                # Check if element is a file and an image
-                image_paths.append(path)
-        elif os.path.isdir(path):
-            # Check if element is a directory containing images
-            for root, _, files in os.walk(path):
-                for file in files:
-                    if file.lower().endswith((".jpg", ".jpeg", ".png")):
-                        image_paths.append(os.path.join(root, file))
-    return image_paths
-
-
 def argparse_flags() -> argparse.Namespace:
     """
     Parse command line arguments
@@ -147,18 +117,57 @@ def argparse_flags() -> argparse.Namespace:
     return parsed_args
 
 
+def balance_and_augment_dataset(images_path: list) -> None:
+    """
+    Balance and augment dataset for effective classification
+    :param images_path: paths of all the images in directory
+    :return:
+    """
+    print("Dataset Balancing...")
+    folder_to_images = defaultdict(list)
+    for path in images_path:
+        folder_to_images[os.path.dirname(path)].append(path)
+
+    # Select minimum count of images to balance dataset
+    values = folder_to_images.values()
+    min_count = min(len(dataset_images) for dataset_images in values)
+
+    # Augment each class
+    print("Dataset Augmentation...")
+    for folder, imgs in folder_to_images.items():
+        if len(imgs) > min_count:
+            selected = set(random.sample(imgs, min_count))
+        else:
+            selected = set(imgs)
+        extras = set(imgs) - selected
+        for path in extras:
+            if os.path.exists(path):
+                try:
+                    os.remove(path)
+                except Exception as e:
+                    print(f"Dataset Balance: Failed to delete {path}: {e}")
+        for path in selected:
+            image_augmentation(path)
+
+
 if __name__ == "__main__":
-    args = argparse_flags()
-    images_path = get_image_files(args.paths)
+    try:
+        args = argparse_flags()
+        images_path = get_image_files(args.paths)
 
-    if not images_path:
-        print("Error: No images found in passed parameters.")
+        if not images_path:
+            print("Error: No images found in passed parameters.")
+            sys.exit(1)
+
+        if len(images_path) == 1:
+            # Display augmentations if only one image is processed
+            augmented_images = image_augmentation(images_path[0])
+            plot_image_augmentation(augmented_images)
+        else:
+            # If folder then balance and augment dataset
+            balance_and_augment_dataset(images_path)
+        print("Data augmentation complete, check directory for saved images.")
+
+    except Exception as e:
+        print(f"An error occurred: {e}")
         sys.exit(1)
-
-    if len(images_path) == 1:
-        # Display augmentations if only one image is processed
-        augmented_images = image_augmentation(images_path[0])
-        plot_image_augmentation(augmented_images)
-    else:
-        for img_path in images_path:
-            image_augmentation(img_path)

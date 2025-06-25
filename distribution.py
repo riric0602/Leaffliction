@@ -2,8 +2,8 @@ import argparse
 import os
 import sys
 from collections import defaultdict
-from matplotlib.backend_bases import KeyEvent
 import matplotlib.pyplot as plt
+from utils import close_on_key
 
 
 def plot_distribution(plants: dict) -> None:
@@ -42,11 +42,6 @@ def plot_distribution(plants: dict) -> None:
     plt.tight_layout(rect=[0, 0, 1, 0.95])
     fig.canvas.mpl_connect('key_press_event', close_on_key)
     plt.show()
-
-
-def close_on_key(event: KeyEvent) -> None:
-    if event.key == 'escape':
-        plt.close(event.canvas.figure)
 
 
 def plant_categories(dataset_path: str) -> defaultdict:
@@ -118,11 +113,16 @@ def argparse_flags() -> argparse.Namespace:
 
 
 if __name__ == "__main__":
-    args = argparse_flags()
-    dataset_path = args.path
+    try:
+        args = argparse_flags()
+        dataset_path = args.path
 
-    if os.path.isdir(dataset_path):
-        analyze_dataset(dataset_path)
-    else:
-        print(f"Error: {dataset_path} is not a valid directory.")
+        if os.path.isdir(dataset_path):
+            analyze_dataset(dataset_path)
+        else:
+            print(f"Error: {dataset_path} is not a valid directory.")
+            sys.exit(1)
+
+    except Exception as e:
+        print(f"An error occurred: {e}")
         sys.exit(1)
