@@ -8,33 +8,52 @@ import matplotlib.pyplot as plt
 from matplotlib import image as mpimg
 import cv2
 from utils import close_on_key
+import pathlib
+import zipfile
 
 batch_size = 32
 img_height = 180
 img_width = 180
 
 
-def get_transformed_image(original_image):
-    # Convert PIL image to OpenCV format
+def get_transformed_image(original_image: np.ndarray) -> np.ndarray:
+    """
+    Generate the transformed image from the original image
+    :param original_image: leaf image to be predicted
+    :return: transformed image
+    """
+    # Convert Original image to OpenCV format
     original_cv = cv2.cvtColor(np.array(original_image), cv2.COLOR_RGB2BGR)
 
-    # Convert to HSV color space for better color filtering
+    # Generate the Transformed Image
     hsv = cv2.cvtColor(original_cv, cv2.COLOR_BGR2HSV)
-
-    # Define range for green color in HSV
     lower_green = np.array([25, 40, 40])
     upper_green = np.array([90, 255, 255])
-
-    # Create mask to isolate green parts (i.e., leaf)
     mask = cv2.inRange(hsv, lower_green, upper_green)
-
-    # Apply the mask on the original image
     highlighted = cv2.bitwise_and(original_cv, original_cv, mask=mask)
-
-    # Convert back to RGB for displaying with matplotlib
     transformed_image = cv2.cvtColor(highlighted, cv2.COLOR_BGR2RGB)
 
     return transformed_image
+
+
+def extract_zip(model_name: str) -> pathlib.Path:
+    """
+    Extract the zip file containing learnings
+    :return: the extracted folder
+    """
+    zip_path = pathlib.Path(f"learnings_{model_name}.zip")
+    extract_dir = pathlib.Path(f"learnings_{model_name}")
+
+    if extract_dir.exists():
+        return extract_dir
+
+    print("Extracting learnings...")
+    extract_dir.mkdir(exist_ok=True)
+
+    with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+        zip_ref.extractall(extract_dir)
+
+    return extract_dir
 
 
 def argparse_flags() -> argparse.Namespace:
@@ -44,6 +63,14 @@ def argparse_flags() -> argparse.Namespace:
     """
     parser = argparse.ArgumentParser(
         description="Predict leaf disease"
+    )
+
+    parser.add_argument(
+        "-m",
+        "--model",
+        type=str,
+        required=True,
+        help="Model (Apple/Grape) to use for prediction",
     )
 
     parser.add_argument(
@@ -66,16 +93,22 @@ if __name__ == "__main__":
             print("Error: Image path does not exist.")
             sys.exit(1)
 
-        if not os.path.exists("leaffliction_model.keras") or not os.path.exists("class_names.json"):
+        if args.model != "Apple" and args.model != "Grape":
+            print("Error: Model must be either Apple or Grape.")
+            sys.exit(1)
+
+        model_name = args.model
+        extract_dir = extract_zip(model_name)
+        model_path = extract_dir / f"{model_name}_model.keras"
+        classes_path = extract_dir / "class_names.json"
+
+        if not os.path.exists(model_path) or not os.path.exists(classes_path):
             print("Error: Model/Classes not found. Train the model before prediction.")
             sys.exit(1)
 
-        model = tf.keras.models.load_model("leaffliction_model.keras")
-        with open("class_names.json", "r") as f:
+        model = tf.keras.models.load_model(model_path)
+        with open(classes_path, "r") as f:
             class_names = json.load(f)
-
-        # Load original image for display
-        original_img = mpimg.imread(image_path)
 
         # Load and preprocess image for model
         img = tf.keras.utils.load_img(
@@ -90,9 +123,10 @@ if __name__ == "__main__":
         predicted_class = class_names[np.argmax(score)]
         confidence = 100 * np.max(score)
 
+        # Plot both images and prediction
+        original_img = mpimg.imread(image_path)
         transformed_image = get_transformed_image(img)
 
-        # Plot both images and prediction
         fig, axes = plt.subplots(1, 2, figsize=(10, 5))
         fig.canvas.mpl_connect('key_press_event', close_on_key)
 
