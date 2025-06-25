@@ -7,6 +7,7 @@ import tensorflow as tf
 import matplotlib.pyplot as plt
 from matplotlib import image as mpimg
 import cv2
+from utils import close_on_key
 
 batch_size = 32
 img_height = 180
@@ -93,6 +94,7 @@ if __name__ == "__main__":
 
         # Plot both images and prediction
         fig, axes = plt.subplots(1, 2, figsize=(10, 5))
+        fig.canvas.mpl_connect('key_press_event', close_on_key)
 
         axes[0].imshow(original_img)
         axes[0].set_title(f"Original Image {image_name}")

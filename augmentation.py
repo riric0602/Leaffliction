@@ -56,7 +56,6 @@ def augment_image(image: np.ndarray, augmentations: list, path: str) -> list:
             save_path,
             cv2.cvtColor(augmented_image, cv2.COLOR_RGB2BGR)
         )
-        print(f"Saving {new_filename} in directory {base_dir}.")
 
     return augmented_images
 
@@ -118,6 +117,36 @@ def argparse_flags() -> argparse.Namespace:
     return parsed_args
 
 
+def balance_and_augment_dataset(images_path: list) -> None:
+    """
+    Balance and augment dataset for effective classification
+    :param images_path: paths of all the images in directory
+    :return:
+    """
+    print("Dataset Balancing...")
+    folder_to_images = defaultdict(list)
+    for path in images_path:
+        folder_to_images[os.path.dirname(path)].append(path)
+
+    # Select minimum count of images to balance dataset
+    values = folder_to_images.values()
+    min_count = min(len(dataset_images) for dataset_images in values)
+
+    # Augment each class
+    print("Dataset Augmentation...")
+    for folder, imgs in folder_to_images.items():
+        selected = set(random.sample(imgs, min_count)) if len(imgs) > min_count else set(imgs)
+        extras = set(imgs) - selected
+        for path in extras:
+            if os.path.exists(path):
+                try:
+                    os.remove(path)
+                except Exception as e:
+                    print(f"Dataset Balance: Failed to delete {path}: {e}")
+        for path in selected:
+            image_augmentation(path)
+
+
 if __name__ == "__main__":
     try:
         args = argparse_flags()
@@ -132,30 +161,9 @@ if __name__ == "__main__":
             augmented_images = image_augmentation(images_path[0])
             plot_image_augmentation(augmented_images)
         else:
-            folder_to_images = defaultdict(list)
-            for path in images_path:
-                folder_to_images[os.path.dirname(path)].append(path)
-
-            # Select minimum count of images to balance dataset
-            values = folder_to_images.values()
-            min_count = min(len(dataset_images) for dataset_images in values)
-
-            # Augment each class
-            for folder, imgs in folder_to_images.items():
-                class_name = os.path.basename(folder)
-                selected = set(random.sample(imgs, min_count)) if len(imgs) > min_count else set(imgs)
-                extras = set(imgs) - selected
-                for path in extras:
-                    if os.path.exists(path):
-                        try:
-                            os.remove(path)
-                            print(f"Deleted extra: {os.path.basename(path)}")
-                        except Exception as e:
-                            print(f"Failed to delete {path}: {e}")
-                    else:
-                        print(f"File already missing, skipped deletion: {path}")
-                for img_path in selected:
-                    image_augmentation(img_path)
+            # If folder then balance and augment dataset
+            balance_and_augment_dataset(images_path)
+        print("Data augmentation complete, check directory for saved images.")
 
     except Exception as e:
         print(f"An error occurred: {e}")

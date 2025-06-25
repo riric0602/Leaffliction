@@ -11,9 +11,8 @@ from tensorflow import keras
 from tensorflow.keras import layers
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.callbacks import History
-from augmentation import image_augmentation
-from utils import get_image_files
-
+from augmentation import balance_and_augment_dataset
+from utils import get_image_files, close_on_key
 
 batch_size = 32
 img_height = 180
@@ -112,7 +111,9 @@ def model_accuracy(history: History) -> float:
 
     epochs_range = range(epochs)
 
-    plt.figure(figsize=(8, 8))
+    fig = plt.figure(figsize=(8, 8))
+    fig.canvas.mpl_connect('key_press_event', close_on_key)
+
     plt.subplot(1, 2, 1)
     plt.plot(epochs_range, acc, label='Training Accuracy')
     plt.plot(epochs_range, val_acc, label='Validation Accuracy')
@@ -162,6 +163,7 @@ if __name__ == "__main__":
             sys.exit(1)
 
         image_paths = get_image_files([data_path])
+        balance_and_augment_dataset(image_paths)
         data_dir = pathlib.Path(data_path)
 
         # Create and save training and validation datasets
