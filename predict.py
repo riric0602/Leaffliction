@@ -103,7 +103,7 @@ if __name__ == "__main__":
         classes_path = extract_dir / "class_names.json"
 
         if not os.path.exists(model_path) or not os.path.exists(classes_path):
-            print("Error: Model/Classes not found. Train the model before prediction.")
+            print("Error: Model not found. Train the model before prediction.")
             sys.exit(1)
 
         model = tf.keras.models.load_model(model_path)
@@ -138,7 +138,10 @@ if __name__ == "__main__":
         axes[1].set_title("Transformed Image")
         axes[1].axis("off")
 
-        plt.suptitle(f"Predicted: {predicted_class} ({confidence:.2f}%)", fontsize=14)
+        plt.suptitle(
+            f"Predicted: {predicted_class} ({confidence:.2f}%)",
+            fontsize=14
+        )
         plt.tight_layout()
         plt.show()
 

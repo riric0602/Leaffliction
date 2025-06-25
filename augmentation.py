@@ -135,7 +135,10 @@ def balance_and_augment_dataset(images_path: list) -> None:
     # Augment each class
     print("Dataset Augmentation...")
     for folder, imgs in folder_to_images.items():
-        selected = set(random.sample(imgs, min_count)) if len(imgs) > min_count else set(imgs)
+        if len(imgs) > min_count:
+            selected = set(random.sample(imgs, min_count))
+        else:
+            selected = set(imgs)
         extras = set(imgs) - selected
         for path in extras:
             if os.path.exists(path):

@@ -15,6 +15,7 @@ from augmentation import balance_and_augment_dataset
 from utils import get_image_files, close_on_key
 import tempfile
 import zipfile
+from pathlib import Path
 
 batch_size = 32
 img_height = 180
@@ -23,7 +24,7 @@ epochs = 10
 AUTOTUNE = tf.data.AUTOTUNE
 
 
-def set_training_validation_dataset(data_dir: pathlib.Path) -> tuple[Dataset, Dataset]:
+def set_training_validation_dataset(data_dir: Path) -> tuple[Dataset, Dataset]:
     """
      Use 80% of the images for training and 20% for validation.
     :param data_dir: main leaves dataset directory
@@ -50,7 +51,7 @@ def set_training_validation_dataset(data_dir: pathlib.Path) -> tuple[Dataset, Da
     return train_ds, val_ds
 
 
-def standardize_and_configure_data(train_ds: Dataset, val_ds: Dataset) -> tuple[Dataset, Dataset]:
+def standardize_and_configure_data(train_ds: Dataset, val_ds: Dataset):
     """
     Standardize and configure training and validation dataset
     :param train_ds: the training dataset
@@ -103,7 +104,7 @@ def model_creation(num_classes: int) -> Sequential:
     return model
 
 
-def model_training(model: Sequential, train_ds: Dataset, val_ds: Dataset) -> tuple[Sequential, History]:
+def model_training(model: Sequential, train_ds: Dataset, val_ds: Dataset):
     """
     Training model based on training and validation sets
     :param model: model to be trained
@@ -181,15 +182,15 @@ def create_zip_with_learnings(data_dir, model, class_names):
             json.dump(class_names, f)
 
         with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-                # Add the entire augmented data directory
-                for root, _, files in os.walk(data_dir):
-                    for file in files:
-                        file_path = pathlib.Path(root) / file
-                        arcname = file_path.relative_to(data_dir.parent)
-                        zipf.write(file_path, arcname)
+            # Add the entire augmented data directory
+            for root, _, files in os.walk(data_dir):
+                for file in files:
+                    file_path = pathlib.Path(root) / file
+                    arcname = file_path.relative_to(data_dir.parent)
+                    zipf.write(file_path, arcname)
 
-                zipf.write(temp_model_path, temp_model_path.name)
-                zipf.write(class_path, class_path.name)
+            zipf.write(temp_model_path, temp_model_path.name)
+            zipf.write(class_path, class_path.name)
 
 
 def argparse_flags() -> argparse.Namespace:
